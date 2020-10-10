@@ -615,7 +615,7 @@ if __name__ == '__main__':
         print('done.')
 
     elif args.problem == 'indset':
-        number_of_nodes = 500
+        number_of_nodes = 750
         affinity = 4
 
         filenames = []
@@ -639,7 +639,7 @@ if __name__ == '__main__':
 
         # small transfer instances
         n = 100
-        number_of_nodes = 500
+        number_of_nodes = 750
         lp_dir = f'data/instances/indset/transfer_{number_of_nodes}_{affinity}'
         print(f"{n} instances in {lp_dir}")
         os.makedirs(lp_dir)
@@ -666,12 +666,22 @@ if __name__ == '__main__':
 
         # test instances
         n = 2000
-        number_of_nodes = 500
+        number_of_nodes = 750
         lp_dir = f'data/instances/indset/test_{number_of_nodes}_{affinity}'
         print(f"{n} instances in {lp_dir}")
         os.makedirs(lp_dir)
         filenames.extend([os.path.join(lp_dir, f'instance_{i+1}.lp') for i in range(n)])
         nnodess.extend([number_of_nodes] * n)
+
+        # validation using lerger instances
+        n = 2000
+        number_of_nodes = 1000
+        lp_dir = f'data/instances/indset/mediumvalid_{number_of_nodes}_{affinity}'
+        print(f"{n} instances in {lp_dir}")
+        os.makedirs(lp_dir)
+        filenames.extend([os.path.join(lp_dir, f'instance_{i+1}.lp') for i in range(n)])
+        nnodess.extend([number_of_nodes] * n)
+
 
         # actually generate the instances
         for filename, nnodes in zip(filenames, nnodess):
