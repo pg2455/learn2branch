@@ -673,7 +673,7 @@ if __name__ == '__main__':
         filenames.extend([os.path.join(lp_dir, f'instance_{i+1}.lp') for i in range(n)])
         nnodess.extend([number_of_nodes] * n)
 
-        # validation using lerger instances
+        # validation using larger instances
         n = 2000
         number_of_nodes = 1000
         lp_dir = f'data/instances/indset/mediumvalid_{number_of_nodes}_{affinity}'
