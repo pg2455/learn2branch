@@ -5,7 +5,7 @@ import numpy as np
 import utilities
 import pathlib
 
-from utilities import log, load_flat_samples
+from utilities import log, load_flat_samples, load_flat_samples_modified
 
 
 def load_samples(filenames, feat_type, label_type, augment, qbnorm, size_limit, logfile=None):
@@ -58,7 +58,15 @@ if __name__ == '__main__':
         type=utilities.valid_seed,
         default=0,
     )
+    parser.add_argument(
+        '--hybrid_data_structure',
+        help='dataset is generated for hybrid models',
+        action="store_true"
+    )
     args = parser.parse_args()
+
+    if args.hybrid_data_structure:
+        load_flat_samples = load_flat_samples_modified
 
     feats_type = 'nbr_maxminmean'
 
@@ -66,7 +74,7 @@ if __name__ == '__main__':
         'setcover': 'setcover/500r_1000c_0.05d',
         'cauctions': 'cauctions/100_500',
         'facilities': 'facilities/100_100_5',
-        'indset': 'indset/500_4',
+        'indset': 'indset/750_4',
     }
     problem_folder = problem_folders[args.problem]
 

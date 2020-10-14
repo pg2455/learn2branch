@@ -384,3 +384,62 @@ def load_flat_samples(filename, feat_type, label_type, augment_feats, normalize_
         raise ValueError(f"Invalid label type: '{label_type}'")
 
     return cand_states, cand_labels, best_cand_idx
+
+def load_flat_samples_modified(filename, feat_type, label_type, augment_feats, normalize_feats):
+    """
+    Modifies the `load_flat_samples` to adapt to the new structure in samples.
+    """
+    with gzip.open(filename, 'rb') as file:
+        sample = pickle.load(file)
+
+    # root data
+    if sample['type'] == "root":
+        state, khalil_state, cands, best_cand, cand_scores = sample['root_state'] # best_cand is relative to cands (in practical_l2b/02_generate_dataset.py)
+        best_cand_idx = best_cand
+    else:
+        # data for gcnn
+        obss, best_cand, obss_feats, _ = sample['obss']
+        v, gcnn_c_feats, gcnn_e = obss
+        gcnn_v_feats = v[:, :19] # gcnn features
+
+        state = {'values':gcnn_c_feats}, gcnn_e, {'values':gcnn_v_feats}
+        sample_cand_scores = obss_feats['scores']
+        cands = np.where(sample_cand_scores != -1)[0]
+        cand_scores = sample_cand_scores[cands]
+        khalil_state = v[:,19:-1][cands]
+
+        best_cand_idx = np.where(cands == best_cand)[0][0]
+
+
+    cands = np.array(cands)
+    cand_scores = np.array(cand_scores)
+
+    cand_states = []
+    if feat_type in ('all', 'gcnn_agg'):
+        cand_states.append(compute_extended_variable_features(state, cands))
+    if feat_type in ('all', 'khalil'):
+        cand_states.append(khalil_state)
+    cand_states = np.concatenate(cand_states, axis=1)
+    # best_cand_idx = np.where(cands == best_cand)[0][0]
+
+    # feature preprocessing
+    cand_states = preprocess_variable_features(cand_states, interaction_augmentation=augment_feats, normalization=normalize_feats)
+
+    if label_type == 'scores':
+        cand_labels = cand_scores
+
+    elif label_type == 'ranks':
+        cand_labels = np.empty(len(cand_scores), dtype=int)
+        cand_labels[cand_scores.argsort()] = np.arange(len(cand_scores))
+
+    elif label_type == 'bipartite_ranks':
+        # scores quantile discretization as in
+        # Khalil et al. (2016) Learning to Branch in Mixed Integer Programming
+        cand_labels = np.empty(len(cand_scores), dtype=int)
+        cand_labels[cand_scores >= 0.8 * cand_scores.max()] = 1
+        cand_labels[cand_scores < 0.8 * cand_scores.max()] = 0
+
+    else:
+        raise ValueError(f"Invalid label type: '{label_type}'")
+
+    return cand_states, cand_labels, best_cand_idx
