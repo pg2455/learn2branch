@@ -17,7 +17,7 @@ import svmrank
 import utilities
 
 from utilities_tf import load_batch_gcnn
-
+from utilities import load_flat_samples, load_flat_samples_modified
 
 def load_batch_flat(sample_files, feats_type, augment_feats, normalize_feats):
     cand_features = []
@@ -25,7 +25,7 @@ def load_batch_flat(sample_files, feats_type, augment_feats, normalize_feats):
     cand_scoress = []
 
     for i, filename in enumerate(sample_files):
-        cand_states, cand_scores, cand_choice = utilities.load_flat_samples(filename, feats_type, 'scores', augment_feats, normalize_feats)
+        cand_states, cand_scores, cand_choice = load_flat_samples(filename, feats_type, 'scores', augment_feats, normalize_feats)
 
         cand_features.append(cand_states)
         cand_choices.append(cand_choice)
@@ -126,34 +126,60 @@ if __name__ == '__main__':
         type=int,
         default=0,
     )
+    parser.add_argument(
+        '--hybrid_data_structure',
+        help='dataset is generated for hybrid models',
+        action="store_true"
+    )
+    parser.add_argument(
+        '--ml_comp_brancher',
+        help='any of the ml-competitor branching scheme',
+        type=str,
+        default='',
+        choices=['extratrees_gcnn_agg', 'lambdamart_khalil', 'svmrank_khalil', '', 'all']
+    )
+    parser.add_argument(
+        '--no_gnn',
+        help='do not evaluate gnn models',
+        action="store_true"
+    )
     args = parser.parse_args()
 
     print(f"problem: {args.problem}")
     print(f"gpu: {args.gpu}")
 
-    os.makedirs("results", exist_ok=True)
-    result_file = f"results/{args.problem}_validation_{time.strftime('%Y%m%d-%H%M%S')}.csv"
-    seeds = [0, 1, 2, 3, 4]
-    gcnn_models = ['baseline']
-    other_models = ['extratrees_gcnn_agg', 'lambdamart_khalil', 'svmrank_khalil']
     test_batch_size = 128
     top_k = [1, 3, 5, 10]
+
+    if args.hybrid_data_structure:
+        load_flat_samples = load_flat_samples_modified
+        seeds = [0, 1, 2]
+        os.makedirs("test_results", exist_ok=True)
+        result_file = f"test_results/{args.problem}_test_{time.strftime('%Y%m%d-%H%M%S')}.csv"
+    else:
+        os.makedirs("results", exist_ok=True)
+        result_file = f"results/{args.problem}_test_{time.strftime('%Y%m%d-%H%M%S')}.csv"
+        seeds = [0, 1, 2, 3, 4]
+
+    gcnn_models = ['baseline'] if not args.no_gnn else []
+    # ml comp
+    if args.ml_comp_brancher == "all":
+        other_models = ['extratrees_gcnn_agg', 'lambdamart_khalil', 'svmrank_khalil']
+    elif args.ml_comp_brancher == "":
+        other_models = []
+    else:
+        other_models = [args.ml_comp_brancher]
 
     problem_folders = {
         'setcover': 'setcover/500r_1000c_0.05d',
         'cauctions': 'cauctions/100_500',
         'facilities': 'facilities/100_100_5',
-        'indset': 'indset/500_4',
+        'indset': 'indset/750_4',
     }
     problem_folder = problem_folders[args.problem]
 
     if args.problem == 'setcover':
-        gcnn_models += ['mean_convolution', 'no_prenorm']
-
-    result_file = f"results/{args.problem}_test_{time.strftime('%Y%m%d-%H%M%S')}"
-
-    result_file = result_file + '.csv'
-    os.makedirs('results', exist_ok=True)
+        gcnn_models += ['mean_convolution', 'no_prenorm'] if not args.no_gnn else []
 
     ### TENSORFLOW SETUP ###
     if args.gpu == -1:
