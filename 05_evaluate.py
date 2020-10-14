@@ -172,12 +172,12 @@ if __name__ == '__main__':
     instances = []
     seeds = [0, 1, 2, 3, 4]
     time_limit = args.time_limit
+    device = "CPU" if args.gpu == -1 else "GPU"
 
     if args.hybrid_data_structure:
         seeds = [0]
         result_dir = f"eval_results/{args.problem}"
         os.makedirs(result_dir, exist_ok=True)
-        device = "CPU" if args.gpu == -1 else "GPU"
         result_file = f"{result_dir}/learn2branch_{device}_{time.strftime('%Y%m%d-%H%M%S')}.csv"
     else:
         os.makedirs('results', exist_ok=True)
@@ -369,6 +369,8 @@ if __name__ == '__main__':
                     'ncutoffs': ncutoffs,
                     'walltime': walltime,
                     'proctime': proctime,
+                    'problem': args.problem,
+                    'device': device
                 })
 
                 csvfile.flush()
