@@ -316,6 +316,8 @@ if __name__ == '__main__':
         'ncutoffs',
         'walltime',
         'proctime',
+        'problem',
+        'device'
     ]
 
     with open(result_file, 'w', newline='') as csvfile:
