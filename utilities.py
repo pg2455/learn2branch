@@ -76,6 +76,7 @@ def extract_state(model, buffer=None):
 
     # update state from buffer if any
     s = model.getState(buffer['scip_state'] if 'scip_state' in buffer else None)
+    buffer['scip_state'] = s
 
     if 'state' in buffer:
         obj_norm = buffer['state']['obj_norm']
@@ -93,9 +94,11 @@ def extract_state(model, buffer=None):
         col_feats = buffer['state']['col_feats']
     else:
         col_feats = {}
+        col_feats_extra = {}
         col_feats['type'] = np.zeros((n_cols, 4))  # BINARY INTEGER IMPLINT CONTINUOUS
         col_feats['type'][np.arange(n_cols), s['col']['types']] = 1
         col_feats['coef_normalized'] = s['col']['coefs'].reshape(-1, 1) / obj_norm
+        col_feats_extra['coef_raw'] = s['col']['coefs'].reshape(-1, 1)
 
     col_feats['has_lb'] = ~np.isnan(s['col']['lbs']).reshape(-1, 1)
     col_feats['has_ub'] = ~np.isnan(s['col']['ubs']).reshape(-1, 1)
@@ -127,6 +130,7 @@ def extract_state(model, buffer=None):
         has_rhs = buffer['state']['has_rhs']
     else:
         row_feats = {}
+        row_feats_extra = {}
         has_lhs = np.nonzero(~np.isnan(s['row']['lhss']))[0]
         has_rhs = np.nonzero(~np.isnan(s['row']['rhss']))[0]
         row_feats['obj_cosine_similarity'] = np.concatenate((
@@ -135,6 +139,12 @@ def extract_state(model, buffer=None):
         row_feats['bias'] = np.concatenate((
             -(s['row']['lhss'] / row_norms)[has_lhs],
             +(s['row']['rhss'] / row_norms)[has_rhs])).reshape(-1, 1)
+
+        row_feats_extra['raw_bias'] = np.concatenate((
+            -(s['row']['lhss'])[has_lhs],
+            +(s['row']['rhss'])[has_rhs])).reshape(-1, 1)
+        row_feats_extra['norm'] = row_norms
+
 
     row_feats['is_tight'] = np.concatenate((
         s['row']['is_at_lhs'][has_lhs],
@@ -190,6 +200,15 @@ def extract_state(model, buffer=None):
 
         edge_feats['coef_normalized'] = coef_matrix.data.reshape(-1, 1)
 
+        coef_matrix_raw = sp.csr_matrix(
+            ( s['nzrcoef']['vals'],
+            (s['nzrcoef']['rowidxs'], s['nzrcoef']['colidxs'])
+            ), shape=(len(s['row']['nnzrs']), len(s['col']['types']))
+        )
+        coef_matrix_raw = sp.vstack((
+            -coef_matrix_raw[has_lhs, :],
+            coef_matrix_raw[has_rhs, :])).tocoo(copy=False)
+
     edge_feat_names = [[k, ] if v.shape[1] == 1 else [f'{k}_{i}' for i in range(v.shape[1])] for k, v in edge_feats.items()]
     edge_feat_names = [n for names in edge_feat_names for n in names]
     edge_feat_indices = np.vstack([edge_row_idxs, edge_col_idxs])
@@ -210,6 +229,9 @@ def extract_state(model, buffer=None):
             'edge_row_idxs': edge_row_idxs,
             'edge_col_idxs': edge_col_idxs,
             'edge_feats': edge_feats,
+            'row_feats_extra': row_feats_extra,
+            'coef_matrix_raw': coef_matrix_raw,
+            'col_feats_extra': col_feats_extra
         }
 
     return constraint_features, edge_features, variable_features
