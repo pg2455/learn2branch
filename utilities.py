@@ -92,13 +92,14 @@ def extract_state(model, buffer=None):
 
     if 'state' in buffer:
         col_feats = buffer['state']['col_feats']
+        raw_col_feats = buffer['state']['raw_col_feats']
     else:
         col_feats = {}
-        col_feats_extra = {}
+        raw_col_feats = {}
         col_feats['type'] = np.zeros((n_cols, 4))  # BINARY INTEGER IMPLINT CONTINUOUS
         col_feats['type'][np.arange(n_cols), s['col']['types']] = 1
         col_feats['coef_normalized'] = s['col']['coefs'].reshape(-1, 1) / obj_norm
-        col_feats_extra['coef_raw'] = s['col']['coefs'].reshape(-1, 1)
+        raw_col_feats['coef_raw'] = s['col']['coefs'].reshape(-1, 1)
 
     col_feats['has_lb'] = ~np.isnan(s['col']['lbs']).reshape(-1, 1)
     col_feats['has_ub'] = ~np.isnan(s['col']['ubs']).reshape(-1, 1)
@@ -120,7 +121,8 @@ def extract_state(model, buffer=None):
 
     variable_features = {
         'names': col_feat_names,
-        'values': col_feat_vals,}
+        'values': col_feat_vals,
+        'raw': raw_col_feats}
 
     # Row features
 
@@ -128,9 +130,10 @@ def extract_state(model, buffer=None):
         row_feats = buffer['state']['row_feats']
         has_lhs = buffer['state']['has_lhs']
         has_rhs = buffer['state']['has_rhs']
+        raw_row_feats = buffer['state']['raw_row_feats']
     else:
         row_feats = {}
-        row_feats_extra = {}
+        raw_row_feats = {}
         has_lhs = np.nonzero(~np.isnan(s['row']['lhss']))[0]
         has_rhs = np.nonzero(~np.isnan(s['row']['rhss']))[0]
         row_feats['obj_cosine_similarity'] = np.concatenate((
@@ -140,10 +143,10 @@ def extract_state(model, buffer=None):
             -(s['row']['lhss'] / row_norms)[has_lhs],
             +(s['row']['rhss'] / row_norms)[has_rhs])).reshape(-1, 1)
 
-        row_feats_extra['raw_bias'] = np.concatenate((
+        raw_row_feats['raw_bias'] = np.concatenate((
             -(s['row']['lhss'])[has_lhs],
             +(s['row']['rhss'])[has_rhs])).reshape(-1, 1)
-        row_feats_extra['norm'] = row_norms
+        raw_row_feats['norm'] = row_norms
 
 
     row_feats['is_tight'] = np.concatenate((
@@ -179,13 +182,15 @@ def extract_state(model, buffer=None):
 
     constraint_features = {
         'names': row_feat_names,
-        'values': row_feat_vals,}
+        'values': row_feat_vals,
+        'raw': raw_row_feats}
 
     # Edge features
     if 'state' in buffer:
         edge_row_idxs = buffer['state']['edge_row_idxs']
         edge_col_idxs = buffer['state']['edge_col_idxs']
         edge_feats = buffer['state']['edge_feats']
+        raw_coef_matrix = buffer['state']['raw_coef_matrix']
     else:
         coef_matrix = sp.csr_matrix(
             (s['nzrcoef']['vals'] / row_norms[s['nzrcoef']['rowidxs']],
@@ -200,14 +205,14 @@ def extract_state(model, buffer=None):
 
         edge_feats['coef_normalized'] = coef_matrix.data.reshape(-1, 1)
 
-        coef_matrix_raw = sp.csr_matrix(
+        raw_coef_matrix = sp.csr_matrix(
             ( s['nzrcoef']['vals'],
             (s['nzrcoef']['rowidxs'], s['nzrcoef']['colidxs'])
             ), shape=(len(s['row']['nnzrs']), len(s['col']['types']))
         )
-        coef_matrix_raw = sp.vstack((
-            -coef_matrix_raw[has_lhs, :],
-            coef_matrix_raw[has_rhs, :])).tocoo(copy=False)
+        raw_coef_matrix = sp.vstack((
+            -raw_coef_matrix[has_lhs, :],
+            raw_coef_matrix[has_rhs, :])).tocoo(copy=False)
 
     edge_feat_names = [[k, ] if v.shape[1] == 1 else [f'{k}_{i}' for i in range(v.shape[1])] for k, v in edge_feats.items()]
     edge_feat_names = [n for names in edge_feat_names for n in names]
@@ -217,7 +222,8 @@ def extract_state(model, buffer=None):
     edge_features = {
         'names': edge_feat_names,
         'indices': edge_feat_indices,
-        'values': edge_feat_vals,}
+        'values': edge_feat_vals,
+        'raw': raw_coef_matrix}
 
     if 'state' not in buffer:
         buffer['state'] = {
@@ -229,9 +235,10 @@ def extract_state(model, buffer=None):
             'edge_row_idxs': edge_row_idxs,
             'edge_col_idxs': edge_col_idxs,
             'edge_feats': edge_feats,
-            'row_feats_extra': row_feats_extra,
-            'coef_matrix_raw': coef_matrix_raw,
-            'col_feats_extra': col_feats_extra
+            'raw_row_feats': raw_row_feats,
+            'raw_col_feats': raw_col_feats,
+            'raw_coef_matrix': raw_coef_matrix
+
         }
 
     return constraint_features, edge_features, variable_features
